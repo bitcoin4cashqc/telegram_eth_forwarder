@@ -72,33 +72,35 @@ async def monitor_messages(event):
         evm_matches = re.findall(EVM_ADDRESS_REGEX, message_text)
         solana_matches = re.findall(SOLANA_ADDRESS_REGEX, message_text)
 
-        # If any address matches, process and forward the message
+       # Inside monitor_messages function:
         if evm_matches or solana_matches:
             try:
-                # Determine the first matched address and its type
+                # Extract the first match and determine the type
                 address = None
-                links_msg = ""  # String to hold all formatted links
+                links_msg = ""
+
                 if evm_matches:
                     address = evm_matches[0]
                 elif solana_matches:
                     address = solana_matches[0]
 
-                # Format each link in LINKS
-                for key, url in LINKS.items():
-                    # Special handling for BitFootBot links
+                # Build the links message
+                for key, url in LINKS.items():  # Ensure you use .items() to iterate over dictionary
                     if "BitFootBot" in key:
                         if evm_matches:
-                            links_msg += formatLink(key, url, f"{address}_ETH")
+                            links_msg += formatLink(key, url, address + "_ETH")
                         elif solana_matches:
-                            links_msg += formatLink(key, url, f"{address}_SOL")
+                            links_msg += formatLink(key, url, address + "_SOL")
                     else:
                         links_msg += formatLink(key, url, address)
 
+                target_entity = await client.get_entity(MAIN_TARGET_GROUP)
                 # Send the formatted message to the target group
+                print(links_msg)
                 await client.send_message(
-                    MAIN_TARGET_GROUP,
+                    target_entity,
                     f"🔔 Forwarded message from {sender_name} in {chat_title}:\n\n{message_text}\n\n{links_msg}",
-                    link_preview=False  # Disable link previews for cleaner display
+                    link_preview=False
                 )
                 print(f"Message forwarded with address {address} from {sender_name} in {chat_title}:\n\n{message_text}")
 
