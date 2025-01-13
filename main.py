@@ -11,8 +11,14 @@ load_dotenv()
 API_ID = int(os.getenv("API_ID"))  # Telegram API ID
 API_HASH = os.getenv("API_HASH")  # Telegram API Hash
 MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP"))  # Target group/channel ID for forwarding
-ALLOWED_USERS = os.getenv("ALLOWED_USERS").split(",")  # List of allowed usernames
-MONITORED_GROUPS = list(map(int, os.getenv("MONITORED_GROUPS").split(",")))  # Monitored group IDs
+ALLOWED_USERS = [
+    int(user) if user.isdigit() else user
+    for user in os.getenv("ALLOWED_USERS").split(",")
+]
+MONITORED_GROUPS = [
+    int(group) if group.isdigit() else group
+    for group in os.getenv("MONITORED_GROUPS").split(",")
+]
 LINKS = json.loads(os.getenv("LINKS"))  # Links dictionary loaded from .env
 
 # Regex patterns for EVM and Solana addresses
@@ -58,14 +64,15 @@ async def monitor_messages(event):
     chat_title = chat.title if hasattr(chat, "title") else "Unknown Chat"
     sender_username = sender.username if sender.username else None
 
-    # Process messages only from monitored groups
-    if chat_id in MONITORED_GROUPS:
+    # Check if the chat is in the monitored groups list by name or ID
+    if chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS:
         # Determine if the sender is a user or a channel
         sender_name = chat_title if isinstance(sender, type(chat)) else sender_username
 
-        # Verify if the sender is allowed
-        if sender_username and sender_username not in ALLOWED_USERS:
-            print(f"Unauthorized user @{sender_username} in {chat_title}.")
+        # Verify if the sender is allowed by username or user ID
+        sender_id = sender.id
+        if sender_username and sender_username not in ALLOWED_USERS and sender_id not in ALLOWED_USERS:
+            print(f"Unauthorized user @{sender_username} (ID: {sender_id}) in {chat_title} (ID: {chat_id}).")
             return
 
         # Look for EVM or Solana addresses in the message
