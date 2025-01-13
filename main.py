@@ -1,45 +1,69 @@
 from telethon import TelegramClient, events
 import re
+import os
+import json
+from dotenv import load_dotenv
 
-# Your API ID and Hash from https://my.telegram.org
-API_ID = 15522  # Replace with your API ID
-API_HASH = "92734b3e396ec66fa"  # Replace with your API Hash
+# Load environment variables from .env file
+load_dotenv()
 
-# Main target group/channel to forward messages to
-MAIN_TARGET_GROUP = 2260267566  # Replace with your target group ID
-
-# List of allowed users (usernames)
-ALLOWED_USERS = ["SoliditySam", "User2", "User3"]
-
-# List of groups/channels to monitor (by ID)
-MONITORED_GROUPS = [4796838775, 2260267566]  # Replace with the specific group/channel IDs
+# Fetch configuration from .env file
+API_ID = int(os.getenv("API_ID"))  # Telegram API ID
+API_HASH = os.getenv("API_HASH")  # Telegram API Hash
+MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP"))  # Target group/channel ID for forwarding
+ALLOWED_USERS = os.getenv("ALLOWED_USERS").split(",")  # List of allowed usernames
+MONITORED_GROUPS = list(map(int, os.getenv("MONITORED_GROUPS").split(",")))  # Monitored group IDs
+LINKS = json.loads(os.getenv("LINKS"))  # Links dictionary loaded from .env
 
 # Regex patterns for EVM and Solana addresses
-EVM_ADDRESS_REGEX = r"0x[a-fA-F0-9]{40}"  # EVM addresses
-SOLANA_ADDRESS_REGEX = r"[1-9A-HJ-NP-Za-km-z]{32,44}"  # Solana addresses
+EVM_ADDRESS_REGEX = r"0x[a-fA-F0-9]{40}"  # EVM (Ethereum) address pattern
+SOLANA_ADDRESS_REGEX = r"[1-9A-HJ-NP-Za-km-z]{32,44}"  # Solana address pattern
 
 # Initialize the Telegram client
 client = TelegramClient("session", API_ID, API_HASH)
 
 
+def formatLink(key, url, data):
+    """
+    Format a single link by replacing the 'data' placeholder with the provided data value.
+
+    Args:
+        key (str): The description of the link (e.g., "Buy On BitFootBot").
+        url (str): The URL template containing the 'data' placeholder.
+        data (str): The value to replace 'data' in the URL.
+
+    Returns:
+        str: A formatted link as a Markdown-compatible string.
+    """
+    formatted_url = url.replace("data", data)  # Replace the placeholder in the URL
+    formatted_link = f"[{key}]({formatted_url})\n\n"  # Format the link with Markdown
+    return formatted_link
+
+
 @client.on(events.NewMessage)
 async def monitor_messages(event):
-    # Get chat and sender details
+    """
+    Monitor incoming messages in specified groups and process them.
+
+    Args:
+        event (telethon.events.NewMessage.Event): The event triggered by a new message.
+    """
+    # Extract chat and sender details
     chat = await event.get_chat()
     sender = await event.get_sender()
     message_text = event.message.message if event.message else ""
 
-    # Extract details
+    # Extract chat and sender metadata
     chat_id = chat.id
     chat_title = chat.title if hasattr(chat, "title") else "Unknown Chat"
     sender_username = sender.username if sender.username else None
 
-    # Check if the chat is in the monitored groups list
+    # Process messages only from monitored groups
     if chat_id in MONITORED_GROUPS:
-        # Determine if the message is from a channel or a user
+        # Determine if the sender is a user or a channel
         sender_name = chat_title if isinstance(sender, type(chat)) else sender_username
 
-        # Check if the sender is authorized
+        # Verify if the sender is allowed
         if sender_username and sender_username not in ALLOWED_USERS:
             print(f"Unauthorized user @{sender_username} in {chat_title}.")
             return
@@ -48,38 +72,50 @@ async def monitor_messages(event):
         evm_matches = re.findall(EVM_ADDRESS_REGEX, message_text)
         solana_matches = re.findall(SOLANA_ADDRESS_REGEX, message_text)
 
-        # If any matches are found, forward the message
+        # If any address matches, process and forward the message
         if evm_matches or solana_matches:
             try:
-                # Extract the first match and determine the type
+                # Determine the first matched address and its type
                 address = None
+                links_msg = ""  # String to hold all formatted links
                 if evm_matches:
-                    address = evm_matches[0] + "_ETH"
+                    address = evm_matches[0]
                 elif solana_matches:
-                    address = solana_matches[0] + "_SOL"
+                    address = solana_matches[0]
 
-                # Construct the message with the appropriate links
-                if address:
-                    await client.send_message(
-                        MAIN_TARGET_GROUP,
-                        f"🔔 Forwarded message from {sender_name} in {chat_title}:\n\n{message_text}\n\n"
-                        f"[Buy On BitFootBot](https://t.me/BitFootBot?start=buy={address})\n\n"
-                        f"[Sell On BitFootBot](https://t.me/BitFootBot?start=sell={address})",
-                        link_preview=False
-                    )
-                    print(f"Message forwarded with address {address} from {sender_name} in {chat_title}:\n\n{message_text}")
-                else:
-                    print(f"No valid address found in the message: {message_text}")
+                # Format each link in LINKS
+                for key, url in LINKS.items():
+                    # Special handling for BitFootBot links
+                    if "BitFootBot" in key:
+                        if evm_matches:
+                            links_msg += formatLink(key, url, f"{address}_ETH")
+                        elif solana_matches:
+                            links_msg += formatLink(key, url, f"{address}_SOL")
+                    else:
+                        links_msg += formatLink(key, url, address)
+
+                # Send the formatted message to the target group
+                await client.send_message(
+                    MAIN_TARGET_GROUP,
+                    f"🔔 Forwarded message from {sender_name} in {chat_title}:\n\n{message_text}\n\n{links_msg}",
+                    link_preview=False  # Disable link previews for cleaner display
+                )
+                print(f"Message forwarded with address {address} from {sender_name} in {chat_title}:\n\n{message_text}")
+
             except Exception as e:
                 print(f"Failed to forward message: {e}")
-
+        else:
+            print(f"No valid address found in the message: {message_text}")
     else:
         print(f"Ignored message from unmonitored chat ID {chat_id} ({chat_title}).")
 
 
 def main():
+    """
+    Main function to start the Telegram monitoring bot.
+    """
     print("Starting Telegram monitoring...")
-    # Start the client
+    # Start the Telegram client
     with client:
         client.run_until_disconnected()
 
