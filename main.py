@@ -77,29 +77,6 @@ async def monitor_messages(event):
         print(f"Ignored message from unmonitored chat ID {chat_id} ({chat_title}).")
 
 
-@client.on(events.CallbackQuery(data=re.compile(b"forward_to_bot_(\\d+)")))
-async def handle_forward_to_bot(event):
-    try:
-        # Extract message ID from the callback data
-        message_id = int(event.data.decode().split("_")[-1])
-
-        # Fetch the original message from the target group
-        original_message = await client.get_messages(MAIN_TARGET_GROUP, ids=message_id)
-
-        if original_message:
-            # Forward the original message to the bot
-            await client.send_message(CRYPTO_BOT, original_message.text)
-
-            # Notify the user
-            await event.answer("Message forwarded to the bot!", alert=True)
-        else:
-            await event.answer("Failed to retrieve the original message.", alert=True)
-
-    except Exception as e:
-        print(f"Error handling callback query: {e}")
-        await event.answer("An error occurred. Please try again later.", alert=True)
-
-
 def main():
     print("Starting Telegram monitoring...")
     # Start the client
