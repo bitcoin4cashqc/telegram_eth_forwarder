@@ -116,10 +116,11 @@ async def bot_listener(event):
         # Generate inline buttons
         buttons = format_button_links(address, address_suffix)
 
-        target_entity_bot = await bot_client.get_entity(MAIN_TARGET_GROUP)
+        
 
         # Forward the message with buttons to the main target group
         try:
+            target_entity_bot = await bot_client.get_entity(MAIN_TARGET_GROUP)
             await bot_client.send_message(
                 target_entity_bot,
                 f"{message_text}",
