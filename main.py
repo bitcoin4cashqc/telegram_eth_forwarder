@@ -66,7 +66,7 @@ async def personal_listener(event):
 
     
     # Process messages only from monitored groups
-    if (chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS) and (sender_username in ALLOWED_USERS or sender.id in ALLOWED_USERS):
+    if (chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS):
         evm_matches = re.findall(EVM_ADDRESS_REGEX, message_text)
         solana_matches = re.findall(SOLANA_ADDRESS_REGEX, message_text)
 
