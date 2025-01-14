@@ -56,10 +56,14 @@ async def personal_listener(event):
     chat = await event.get_chat()
     sender = await event.get_sender()
     message_text = event.message.message if event.message else ""
-
+    print(chat)
+    print(sender)
+    print(message_text)
     chat_id = chat.id
     chat_title = chat.title if hasattr(chat, "title") else "Unknown Chat"
     sender_username = sender.username if sender.username else None
+    print(chat_id)
+    print(chat_title)
 
     
     # Process messages only from monitored groups
