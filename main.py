@@ -11,12 +11,9 @@ load_dotenv()
 API_ID = int(os.getenv("API_ID"))  # Telegram API ID
 API_HASH = os.getenv("API_HASH")  # Telegram API Hash
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Bot token
-BOT_USERNAME = os.getenv("BOT_USERNAME")
-MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP"))  # Target group/channel ID for forwarding
-ALLOWED_USERS = [
-    int(user) if user.isdigit() else user
-    for user in os.getenv("ALLOWED_USERS").split(",")
-]
+BOT_ID = int(os.getenv("BOT_ID"))
+MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP")) # Target group/channel ID for forwarding
+
 MONITORED_GROUPS = [
     int(group) if group.isdigit() else group
     for group in os.getenv("MONITORED_GROUPS").split(",")
@@ -72,7 +69,8 @@ async def personal_listener(event):
 
         if evm_matches or solana_matches:
             try:
-                target_entity = await bot_client.get_entity(BOT_USERNAME)
+                target_entity = await personal_client.get_input_entity(BOT_ID)
+                target_entity = await personal_client.get_entity(target_entity)
 
                 await personal_client.send_message(
                     target_entity,
@@ -97,6 +95,7 @@ async def bot_listener(event):
 
     # Only process messages forwarded from the personal client
     if sender.id != ADMIN_ID:
+        print("not admin")
         return
     
     # Check if the message is a forwarded message
@@ -120,7 +119,8 @@ async def bot_listener(event):
 
         # Forward the message with buttons to the main target group
         try:
-            target_entity_bot = await bot_client.get_entity(MAIN_TARGET_GROUP)
+            target_entity_bot = await bot_client.get_input_entity(MAIN_TARGET_GROUP)
+            target_entity_bot = await bot_client.get_entity(target_entity_bot)
             await bot_client.send_message(
                 target_entity_bot,
                 f"{message_text}",
@@ -130,8 +130,8 @@ async def bot_listener(event):
             print(f"Message forwarded to main group: {message_text}")
         except Exception as e:
             print(f"Failed to forward message to main group: {e}")
-    #else:
-    #    await event.reply("No valid address found in the message.")
+    else:
+        await event.reply("No valid address found in the message.")
 
 
 def main():
