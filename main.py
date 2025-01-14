@@ -12,7 +12,7 @@ API_ID = int(os.getenv("API_ID"))  # Telegram API ID
 API_HASH = os.getenv("API_HASH")  # Telegram API Hash
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Bot token
 BOT_ID = int(os.getenv("BOT_ID"))
-MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP")) # Target group/channel ID for forwarding
+MAIN_TARGET_GROUP = os.getenv("MAIN_TARGET_GROUP") # Target group/channel ID for forwarding
 
 MONITORED_GROUPS = [
     int(group) if group.isdigit() else group
