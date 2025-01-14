@@ -72,8 +72,10 @@ async def personal_listener(event):
 
         if evm_matches or solana_matches:
             try:
+                target_entity = await bot_client.get_entity(BOT_USERNAME)
+
                 await personal_client.send_message(
-                    BOT_USERNAME,
+                    target_entity,
                     f"🔔 Forwarded message from {chat_title}:\n\n{message_text}"
                 )
                 print(f"Message forwarded to bot from {chat_title}: {message_text}")
@@ -114,10 +116,12 @@ async def bot_listener(event):
         # Generate inline buttons
         buttons = format_button_links(address, address_suffix)
 
+        target_entity_bot = await bot_client.get_entity(MAIN_TARGET_GROUP)
+
         # Forward the message with buttons to the main target group
         try:
             await bot_client.send_message(
-                MAIN_TARGET_GROUP,
+                target_entity_bot,
                 f"{message_text}",
                 buttons=buttons,
                 link_preview=False
