@@ -13,11 +13,16 @@ API_ID = int(os.getenv("API_ID"))  # Telegram API ID
 API_HASH = os.getenv("API_HASH")  # Telegram API Hash
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Bot token
 MAIN_TARGET_GROUP = int(os.getenv("MAIN_TARGET_GROUP"))  # Target group/channel ID for forwarding
+
 MONITORED_GROUPS = [
     int(group) if group.isdigit() else group
     for group in os.getenv("MONITORED_GROUPS").split(",")
 ]
 LINKS = json.loads(os.getenv("LINKS"))  # Links dictionary loaded from .env
+ALLOWED_USERS = [
+    int(user) if user.isdigit() else user
+    for user in os.getenv("ALLOWED_USERS", "").split(",")
+]
 
 # Regex patterns for EVM and Solana addresses
 EVM_ADDRESS_REGEX = r"0x[a-fA-F0-9]{40}"  # EVM (Ethereum) address pattern
@@ -55,14 +60,18 @@ async def personal_listener(event):
     Personal listener to monitor messages and store them in the buffer.
     """
     chat = await event.get_chat()
-   
+    sender = await event.get_sender()
     message_text = event.message.message if event.message else ""
 
     chat_id = chat.id
     chat_title = chat.title if hasattr(chat, "title") else "Unknown Chat"
+    sender_id = sender.id if sender else "anonymous"
+    sender_username = sender.username if sender else "anonymous"
     
-    # Check if the message is from monitored groups
-    if (chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS):
+    # Check if the message is from monitored groups and the sender is allowed
+    if (chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS) and (
+        sender_id in ALLOWED_USERS or sender_username in ALLOWED_USERS
+    ):
         evm_matches = re.findall(EVM_ADDRESS_REGEX, message_text)
         solana_matches = re.findall(SOLANA_ADDRESS_REGEX, message_text)
 
@@ -78,7 +87,7 @@ async def personal_listener(event):
         else:
             print(f"No valid address found in the message: {message_text}")
     else:
-        print(f"Ignored message from unmonitored chat ID {chat_id} ({chat_title}).")
+        print(f"Ignored message from unmonitored chat ID {chat_id} ({chat_title}) or unauthorized sender.")
 
 async def process_buffered_messages():
     """
