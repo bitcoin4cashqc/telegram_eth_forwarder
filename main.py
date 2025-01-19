@@ -162,7 +162,7 @@ async def process_buffered_messages():
                 formatted_message = format_token_message(token_data)
 
                 # Generate inline buttons
-                buttons = format_button_links(address, "_ETH" if evm_matches else "_SOL")
+                buttons = format_button_links(address, "_ETH" if evm_matches else "_Solana")
 
                 # Forward the message with buttons to the main target group
                 try:
