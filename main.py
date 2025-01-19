@@ -3,6 +3,7 @@ import re
 import os
 import json
 import asyncio
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -53,6 +54,49 @@ def format_button_links(address, address_suffix):
         Button.url(key, url.replace("data", address + address_suffix) if "BitFootBot" in key else url.replace("data", address))
         for key, url in LINKS.items()
     ]
+
+def fetch_token_details(chain_id, token_address):
+    """
+    Fetch token details from Dexscreener API.
+
+    Args:
+        chain_id (str): Blockchain chain ID (e.g., "solana").
+        token_address (str): Token address.
+
+    Returns:
+        dict: Parsed token details or None if unavailable.
+    """
+    url = f"https://api.dexscreener.com/token-pairs/v1/{chain_id}/{token_address}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data[0] if data else None
+    except Exception as e:
+        print(f"Failed to fetch token details: {e}")
+    return None
+
+def format_token_message(token_data):
+    """
+    Format the token data into a rich message.
+
+    Args:
+        token_data (dict): Token details fetched from Dexscreener.
+
+    Returns:
+        str: Formatted message.
+    """
+    base = token_data.get("baseToken", {})
+    quote = token_data.get("quoteToken", {})
+    liquidity = token_data.get("liquidity", {})
+    return (
+        f"Name: {base.get('name', 'N/A')} ({base.get('symbol', 'N/A')}) | MC: ${token_data.get('marketCap', 'N/A'):,}\n"
+        f"Mint: {base.get('address', 'N/A')}\n"
+        f"🔎 Deep scan by OurBot\n"
+        f"Dex: {token_data.get('dexId', 'N/A')} | Age: {token_data.get('pairCreatedAt', 'N/A')}\n"
+        f"Liquidity: ${liquidity.get('usd', 'N/A')}\n"
+        f"Dexscreener Chart: {token_data.get('url', 'N/A')}"
+    )
 
 @personal_client.on(events.NewMessage)
 async def personal_listener(event):
@@ -109,24 +153,30 @@ async def process_buffered_messages():
 
             # Determine address type
             address = evm_matches[0] if evm_matches else solana_matches[0]
-            address_suffix = "_ETH" if evm_matches else "_SOL"
+            chain_id = "ethereum" if evm_matches else "solana"
 
-            # Generate inline buttons
-            buttons = format_button_links(address, address_suffix)
+            # Fetch token details
+            token_data = fetch_token_details(chain_id, address)
 
-            # Forward the message with buttons to the main target group
-            try:
-                target_entity_bot = await bot_client.get_input_entity(MAIN_TARGET_GROUP)
-                target_entity_bot = await bot_client.get_entity(target_entity_bot)
-                await bot_client.send_message(
-                    target_entity_bot,
-                    f"{message_text}",
-                    buttons=buttons,
-                    link_preview=False
-                )
-                print(f"Message forwarded to main group: {message_text}")
-            except Exception as e:
-                print(f"Failed to forward message to main group: {e}")
+            if token_data:
+                formatted_message = format_token_message(token_data)
+
+                # Generate inline buttons
+                buttons = format_button_links(address, "_ETH" if evm_matches else "_SOL")
+
+                # Forward the message with buttons to the main target group
+                try:
+                    await bot_client.send_message(
+                        MAIN_TARGET_GROUP,
+                        formatted_message,
+                        buttons=buttons,
+                        link_preview=False
+                    )
+                    print(f"Message forwarded to main group: {formatted_message}")
+                except Exception as e:
+                    print(f"Failed to forward message to main group: {e}")
+            else:
+                print(f"Failed to fetch token details for address: {address}")
 
         await asyncio.sleep(5)  # Sleep before checking the buffer again
 
