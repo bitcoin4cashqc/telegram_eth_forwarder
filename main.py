@@ -5,6 +5,8 @@ import json
 import asyncio
 import requests
 from dotenv import load_dotenv
+from datetime import datetime, timezone
+
 
 # Load environment variables
 load_dotenv()
@@ -89,13 +91,34 @@ def format_token_message(token_data):
     base = token_data.get("baseToken", {})
     quote = token_data.get("quoteToken", {})
     liquidity = token_data.get("liquidity", {})
+    
+    # Convert UNIX timestamp to human-readable age
+    pair_created_at = token_data.get("pairCreatedAt")
+    if pair_created_at:
+        pair_created_time = datetime.fromtimestamp(pair_created_at / 1000, tz=timezone.utc)
+        now = datetime.now(timezone.utc)
+        age_delta = now - pair_created_time
+        # Convert delta to human-readable format
+        if age_delta.days > 0:
+            age = f"{age_delta.days} day(s)"
+        elif age_delta.seconds > 3600:
+            hours = age_delta.seconds // 3600
+            age = f"{hours} hour(s)"
+        elif age_delta.seconds > 60:
+            minutes = age_delta.seconds // 60
+            age = f"{minutes} minute(s)"
+        else:
+            age = f"{age_delta.seconds} second(s)"
+    else:
+        age = "N/A"
+    
     return (
         f"Name: {base.get('name', 'N/A')} ({base.get('symbol', 'N/A')}) | MC: ${token_data.get('marketCap', 'N/A'):,}\n"
-        f"Mint: {base.get('address', 'N/A')}\n"
+        f"Mint: `{base.get('address', 'N/A')}`\n"
         f"🔎 Deep scan by OurBot\n"
-        f"Dex: {token_data.get('dexId', 'N/A')} | Age: {token_data.get('pairCreatedAt', 'N/A')}\n"
+        f"Dex: {token_data.get('dexId', 'N/A')} | Age: {age}\n"
         f"Liquidity: ${liquidity.get('usd', 'N/A')}\n"
-        f"Dexscreener Chart: {token_data.get('url', 'N/A')}"
+        f"[Dexscreener Chart]({token_data.get('url', 'N/A')})"
     )
 
 @personal_client.on(events.NewMessage)
