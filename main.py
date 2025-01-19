@@ -53,7 +53,7 @@ def format_button_links(address, address_suffix):
         list: List of formatted inline buttons.
     """
     return [
-        Button.url(key, url.replace("data", address + address_suffix) if "BitFoot" in key else url.replace("data", address))
+        Button.url(key, url.replace("data", address + address_suffix) if "Bitfoot" in key else url.replace("data", address))
         for key, url in LINKS.items()
     ]
 
