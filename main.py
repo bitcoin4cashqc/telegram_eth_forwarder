@@ -186,7 +186,7 @@ async def process_buffered_messages():
             token_data = fetch_token_details(chain_id, address)
 
             if token_data:
-                formatted_message = f"From User:{sender_username}\n"+format_token_message(token_data)
+                formatted_message = f"From User: @{sender_username}\n"+format_token_message(token_data)
 
                 # Generate inline buttons
                 buttons = format_button_links(address, "_ETH" if evm_matches else "_Solana")
