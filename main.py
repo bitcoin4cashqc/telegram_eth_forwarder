@@ -91,6 +91,7 @@ def format_token_message(token_data):
     base = token_data.get("baseToken", {})
     quote = token_data.get("quoteToken", {})
     liquidity = token_data.get("liquidity", {})
+   
     
     # Convert UNIX timestamp to human-readable age
     pair_created_at = token_data.get("pairCreatedAt")
@@ -113,6 +114,7 @@ def format_token_message(token_data):
         age = "N/A"
     
     return (
+      
         f"Name: {base.get('name', 'N/A')} ({base.get('symbol', 'N/A')}) | MC: ${token_data.get('marketCap', 'N/A'):,}\n"
         f"Mint: `{base.get('address', 'N/A')}`\n"
         f"🔎 Deep scan by OurBot\n"
@@ -145,6 +147,7 @@ async def personal_listener(event):
         if evm_matches or solana_matches:
             async with buffer_lock:
                 message_buffer.append({
+                    "sender_username": sender_username,
                     "chat_title": chat_title,
                     "message_text": message_text,
                     "evm_matches": evm_matches,
@@ -173,6 +176,7 @@ async def process_buffered_messages():
             message_text = message["message_text"]
             evm_matches = message["evm_matches"]
             solana_matches = message["solana_matches"]
+            sender_username = message["sender_username"]
 
             # Determine address type
             address = evm_matches[0] if evm_matches else solana_matches[0]
@@ -182,7 +186,7 @@ async def process_buffered_messages():
             token_data = fetch_token_details(chain_id, address)
 
             if token_data:
-                formatted_message = format_token_message(token_data)
+                formatted_message = f"From User:{sender_username}\n"+format_token_message(token_data)
 
                 # Generate inline buttons
                 buttons = format_button_links(address, "_ETH" if evm_matches else "_Solana")
