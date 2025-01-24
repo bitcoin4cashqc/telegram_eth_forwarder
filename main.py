@@ -4,9 +4,9 @@ import os
 import json
 import asyncio
 import requests
+import sqlite3
 from dotenv import load_dotenv
 from datetime import datetime, timezone
-
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +40,46 @@ message_buffer = []
 
 # Lock to synchronize access to the buffer
 buffer_lock = asyncio.Lock()
+
+# SQLite database setup
+def initialize_database():
+    conn = sqlite3.connect("tokens.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS processed_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            address TEXT UNIQUE,
+            chain_id TEXT,
+            processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+initialize_database()
+
+def is_token_processed(address, chain_id):
+    conn = sqlite3.connect("tokens.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM processed_tokens WHERE address = ? AND chain_id = ?", (address, chain_id)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+def mark_token_as_processed(address, chain_id):
+    conn = sqlite3.connect("tokens.db")
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO processed_tokens (address, chain_id) VALUES (?, ?)", (address, chain_id)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass  # Token already exists
+    finally:
+        conn.close()
 
 def format_button_links(address, address_suffix):
     """
@@ -91,8 +131,7 @@ def format_token_message(token_data):
     base = token_data.get("baseToken", {})
     quote = token_data.get("quoteToken", {})
     liquidity = token_data.get("liquidity", {})
-   
-    
+
     # Convert UNIX timestamp to human-readable age
     pair_created_at = token_data.get("pairCreatedAt")
     if pair_created_at:
@@ -112,9 +151,8 @@ def format_token_message(token_data):
             age = f"{age_delta.seconds} second(s)"
     else:
         age = "N/A"
-    
+
     return (
-      
         f"Name: {base.get('name', 'N/A')} ({base.get('symbol', 'N/A')}) | MC: ${token_data.get('marketCap', 'N/A'):,}\n"
         f"Mint: `{base.get('address', 'N/A')}`\n"
         f"🔎 Deep scan by OurBot\n"
@@ -136,7 +174,7 @@ async def personal_listener(event):
     chat_title = chat.title if hasattr(chat, "title") else "Unknown Chat"
     sender_id = sender.id if sender else "anonymous"
     sender_username = sender.username if sender else "anonymous"
-    
+
     # Check if the message is from monitored groups and the sender is allowed
     if (chat_id in MONITORED_GROUPS or chat_title in MONITORED_GROUPS) and (
         sender_id in ALLOWED_USERS or sender_username in ALLOWED_USERS
@@ -182,11 +220,16 @@ async def process_buffered_messages():
             address = evm_matches[0] if evm_matches else solana_matches[0]
             chain_id = "ethereum" if evm_matches else "solana"
 
+            # Skip if token is already processed
+            if is_token_processed(address, chain_id):
+                print(f"Token {address} on {chain_id} already processed. Skipping.")
+                continue
+
             # Fetch token details
             token_data = fetch_token_details(chain_id, address)
 
             if token_data:
-                formatted_message = f"From User: @{sender_username}\n"+format_token_message(token_data)
+                formatted_message = f"From User: @{sender_username}\n" + format_token_message(token_data)
 
                 # Generate inline buttons
                 buttons = format_button_links(address, "_ETH" if evm_matches else "_Solana")
@@ -199,6 +242,7 @@ async def process_buffered_messages():
                         buttons=buttons,
                         link_preview=False
                     )
+                    mark_token_as_processed(address, chain_id)
                     print(f"Message forwarded to main group: {formatted_message}")
                 except Exception as e:
                     print(f"Failed to forward message to main group: {e}")
